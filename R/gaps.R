@@ -222,7 +222,8 @@ count_gaps <- function(.data, .full = FALSE, .name = c(".from", ".to", ".n")) {
 #' has_gaps(harvest, .full = end())
 has_gaps <- function(.data, .full = FALSE, .name = ".gaps") {
   stopifnot(has_length(.name, 1))
-  if (!is_regular(.data) || vec_size(.data) == 0L) {
+  is_start_stop <- (index(.data)!=index2(.data))
+  if ((!is_regular(.data) && !is_start_stop) || vec_size(.data) == 0L) {
     key_data <- key_data(.data)[key_vars(.data)]
     return(tibble(!!!key_data, !!.name := FALSE))
   }
@@ -232,28 +233,32 @@ has_gaps <- function(.data, .full = FALSE, .name = ".gaps") {
   idx <- index(.data)
   idx_chr <- as_string(idx)
   grped_tbl <- new_grouped_df(.data, groups = key_data(.data))
-  if (is_true(.full)) {
-    idx_full <- seq_generator(.data[[idx_chr]], int)
-    res <- summarise(grped_tbl,
-      !!.name := (length(idx_full) - length(!!idx)) > 0)
-  } else if (is_false(.full)) {
-    res <- summarise(grped_tbl,
-      !!.name := (length(seq_generator(!!idx, int)) - length(!!idx)) > 0
-    )
-  } else if (.full == sym("start()")) {
-    start <- min(.data[[idx_chr]])
-    res <- summarise(grped_tbl,
-      !!.name := (length(seq_generator(c(start, max(!!idx)), int)) - length(!!idx)) > 0
-    )
-  } else if (.full == sym("end()")) {
-    end <- max(.data[[idx_chr]])
-    res <- summarise(grped_tbl,
-      !!.name := (length(seq_generator(c(min(!!idx), end), int)) - length(!!idx)) > 0
-    )
-  } else {
-    abort_invalid_full_arg()
-  }
+  if (!is_start_stop) {
+    if (is_true(.full)) {
+      idx_full <- seq_generator(.data[[idx_chr]], int)
+      res <- summarise(grped_tbl,
+                       !!.name := (length(idx_full) - length(!!idx)) > 0)
+    } else if (is_false(.full)) {
+      res <- summarise(grped_tbl,
+                       !!.name := (length(seq_generator(!!idx, int)) - length(!!idx)) > 0
+      )
+    } else if (.full == sym("start()")) {
+      start <- min(.data[[idx_chr]])
+      res <- summarise(grped_tbl,
+                       !!.name := (length(seq_generator(c(start, max(!!idx)), int)) - length(!!idx)) > 0
+      )
+    } else if (.full == sym("end()")) {
+      end <- max(.data[[idx_chr]])
+      res <- summarise(grped_tbl,
+                       !!.name := (length(seq_generator(c(min(!!idx), end), int)) - length(!!idx)) > 0
+      )
+    } else {
+      abort_invalid_full_arg()
+    }
   tibble(!!!res)
+  } else if (is_start_stop) {
+    print("start_stop compute gaps...")
+  }
 }
 
 tbl_gaps <- function(x, y, .name = c(".from", ".to", ".n")) {
@@ -290,7 +295,7 @@ seq_generator <- function(x, time_units = NULL, length_out = NULL) {
   if (time_units == 0) return(x)
 
   min_x <- min(x)
-  seq_call <- quote(seq(from = min_x, to = max(x), by = time_units, 
+  seq_call <- quote(seq(from = min_x, to = max(x), by = time_units,
     length.out = length_out))
   if (!is.null(length_out)) {
     seq_call <- call_modify(seq_call, to = zap())
