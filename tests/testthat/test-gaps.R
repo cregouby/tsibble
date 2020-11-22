@@ -3,6 +3,11 @@ dat_x <- tibble(
   date = idx_day,
   value = rnorm(5)
 )
+dat_start_stop <- tibble(
+  start = idx_day,
+  stop = idx_day + day(1),
+  value = rnorm(5)
+)
 
 test_that("a tbl_df/data.frame", {
   expect_error(fill_gaps(dat_x), "data.frame")

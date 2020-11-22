@@ -116,6 +116,7 @@ scan_gaps <- function(.data, .full = FALSE) {
 #' @export
 scan_gaps.tbl_ts <- function(.data, .full = FALSE) {
   .full <- quo_get_expr(enquo(.full))
+  is_start_stop <- (index(.data)!=index2(.data))
   int <- interval(.data)
   idx <- index(.data)
   idx_chr <- as_string(idx)
@@ -127,23 +128,27 @@ scan_gaps.tbl_ts <- function(.data, .full = FALSE) {
 
   key <- key(.data)
   keyed_tbl <- new_grouped_df(.data, groups = key_data(.data))
-  if (is_true(.full)) {
-    idx_full <- seq_generator(keyed_tbl[[idx_chr]], int)
-    sum_data <-
-      summarise(keyed_tbl, !!idx_chr := list2(!!idx_chr := idx_full))
-  } else if (is_false(.full)) {
-    sum_data <- summarise(keyed_tbl,
-      !!idx_chr := list2(!!idx_chr := seq_generator(!!idx, int)))
-  } else if (.full == expr("start()")) {
-    start <- min(keyed_tbl[[idx_chr]])
-    sum_data <- summarise(keyed_tbl,
-      !!idx_chr := list2(!!idx_chr := seq_generator(c(start, max(!!idx)), int)))
-  } else if (.full == expr("end()")) {
-    end <- max(keyed_tbl[[idx_chr]])
-    sum_data <- summarise(keyed_tbl,
-      !!idx_chr := list2(!!idx_chr := seq_generator(c(min(!!idx), end), int)))
+  if (!is_start_stop) {
+    if (is_true(.full)) {
+      idx_full <- seq_generator(keyed_tbl[[idx_chr]], int)
+      sum_data <-
+        summarise(keyed_tbl, !!idx_chr := list2(!!idx_chr := idx_full))
+    } else if (is_false(.full)) {
+      sum_data <- summarise(keyed_tbl,
+        !!idx_chr := list2(!!idx_chr := seq_generator(!!idx, int)))
+    } else if (.full == expr("start()")) {
+      start <- min(keyed_tbl[[idx_chr]])
+      sum_data <- summarise(keyed_tbl,
+        !!idx_chr := list2(!!idx_chr := seq_generator(c(start, max(!!idx)), int)))
+    } else if (.full == expr("end()")) {
+      end <- max(keyed_tbl[[idx_chr]])
+      sum_data <- summarise(keyed_tbl,
+        !!idx_chr := list2(!!idx_chr := seq_generator(c(min(!!idx), end), int)))
+    } else {
+      abort_invalid_full_arg()
+    }
   } else {
-    abort_invalid_full_arg()
+    print("start_stop find gaps...")
   }
   ref_data <- unwrap(sum_data, !!idx)
   if (vec_size(ref_data) == vec_size(.data)) {
@@ -257,7 +262,7 @@ has_gaps <- function(.data, .full = FALSE, .name = ".gaps") {
     }
   tibble(!!!res)
   } else if (is_start_stop) {
-    print("start_stop compute gaps...")
+    print("start_stop find gaps...")
   }
 }
 

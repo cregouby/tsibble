@@ -312,7 +312,7 @@ setOldClass(c("interval", "vctrs_rcrd", "vctrs_vctr"))
 #' @importMethodsFrom lubridate as.period
 setMethod("as.period", "interval", function(x, ...) {
   period(
-    year = x$year, 
+    year = x$year,
     month = x$quarter * 3 + x$month,
     week = x$week,
     day = x$day,
