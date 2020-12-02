@@ -147,16 +147,51 @@ scan_gaps.tbl_ts <- function(.data, .full = FALSE) {
     } else {
       abort_invalid_full_arg()
     }
+    ref_data <- unwrap(sum_data, !!idx)
+    if (vec_size(ref_data) == vec_size(.data)) {
+      data0 <- vec_slice(.data, 0)
+      data0[c(key_vars(.data), idx_chr)]
+    } else {
+      gap_data <- anti_join(ref_data, .data, by = c(key_vars(.data), idx_chr))
+      update_meta(gap_data, .data, ordered = NULL, interval = interval(.data))
+    }
   } else {
-    print("start_stop find gaps...")
-  }
-  ref_data <- unwrap(sum_data, !!idx)
-  if (vec_size(ref_data) == vec_size(.data)) {
-    data0 <- vec_slice(.data, 0)
-    data0[c(key_vars(.data), idx_chr)]
-  } else {
-    gap_data <- anti_join(ref_data, .data, by = c(key_vars(.data), idx_chr))
-    update_meta(gap_data, .data, ordered = NULL, interval = interval(.data))
+    print("start_stop scan gaps...")
+    idx2 <- index2(.data)
+    idx2_chr <- as_string(idx2)
+    min_start <- min(min(keyed_tbl[[idx]], na.rm=TRUE), min(keyed_tbl[[idx2]], na.rm=TRUE), na.rm=TRUE)
+    max_end <-   max(max(keyed_tbl[[idx]], na.rm=TRUE), max(keyed_tbl[[idx2]], na.rm=TRUE), na.rm=TRUE)
+    idx_min <- keyed_tbl %>%
+      summarise(!!idx2:= min(min(!!idx, na.rm=TRUE),min(!!idx2, na.rm=TRUE), na.rm = TRUE),
+                !!idx := min_start,
+                .groups = "keep") %>%
+      mutate(is_gap = (!!idx != !!idx2))
+    idx_max <- keyed_tbl %>%
+      summarise(!!idx:= max(max(!!idx, na.rm=TRUE),max(!!idx2, na.rm=TRUE), na.rm = TRUE),
+                !!idx2 := max_end,
+                .groups = "keep")%>%
+      mutate(is_gap = (!!idx != !!idx2))
+    sum_data <- keyed_tbl %>%
+      select(!!idx, !!idx2) %>%
+      arrange(!!idx, .by_group = TRUE) %>%
+      mutate(gap_start = !!idx2 ,
+             gap_stop  = lead(!!idx),
+             is_gap = gap_stop > gap_start + int) %>%
+        filter(is_gap) %>%
+        select(!!idx := gap_start, !!idx2 := gap_stop)
+    if (is_true(.full)) {
+      sum_data <- bind_rows(idx_min, sum_data, idx_max) %>% filter(is_gap) %>% arrange(!!idx, .by_group = TRUE)
+    } else if (is_false(.full)) {
+      sum_data <- sum_data
+    } else if (.full == expr("start()")) {
+      sum_data <- bind_rows(idx_min, sum_data) %>% filter(is_gap) %>% arrange(!!idx, .by_group = TRUE)
+    } else if (.full == expr("end()")) {
+      sum_data <- bind_rows(sum_data, idx_max) %>% filter(is_gap) %>% arrange(!!idx, .by_group = TRUE)
+    } else {
+      abort_invalid_full_arg()
+    }
+    sum_data <- update_meta(sum_data, .data, interval = interval(.data))
+    return(sum_data)
   }
 }
 
@@ -262,7 +297,7 @@ has_gaps <- function(.data, .full = FALSE, .name = ".gaps") {
     }
   tibble(!!!res)
   } else if (is_start_stop) {
-    print("start_stop find gaps...")
+    print("start_stop has gaps...")
   }
 }
 
