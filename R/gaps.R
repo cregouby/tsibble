@@ -120,7 +120,7 @@ scan_gaps.tbl_ts <- function(.data, .full = FALSE) {
   int <- interval(.data)
   idx <- index(.data)
   idx_chr <- as_string(idx)
-  if (unknown_interval(int) || !is_regular(.data)) {
+  if (!is_start_stop && (unknown_interval(int) || !is_regular(.data))) {
     data0 <- vec_slice(.data, 0)
     return(data0[c(key_vars(.data), idx_chr)])
   }
@@ -156,7 +156,7 @@ scan_gaps.tbl_ts <- function(.data, .full = FALSE) {
       update_meta(gap_data, .data, ordered = NULL, interval = interval(.data))
     }
   } else {
-    print("start_stop scan gaps...")
+    # print("start_stop scan gaps...")
     idx2 <- index2(.data)
     idx2_chr <- as_string(idx2)
     min_start <- min(min(keyed_tbl[[idx]], na.rm=TRUE), min(keyed_tbl[[idx2]], na.rm=TRUE), na.rm=TRUE)
@@ -223,6 +223,8 @@ scan_gaps.tbl_ts <- function(.data, .full = FALSE) {
 #'   coord_flip() +
 #'   theme(legend.position = "bottom")
 count_gaps <- function(.data, .full = FALSE, .name = c(".from", ".to", ".n")) {
+  # TODO a better test
+  is_start_stop <- (index(.data)!=index2(.data))
   int <- default_time_units(interval(.data))
   idx <- index(.data)
 
@@ -234,13 +236,16 @@ count_gaps <- function(.data, .full = FALSE, .name = c(".from", ".to", ".n")) {
     out <- vec_cbind(data_key, tbl_gaps(idx_vals, idx_vals, .name = .name))
     return(out)
   }
-
-  idx_full <- seq_generator(.data[[as_string(idx)]], int)
   grped_tbl <- new_grouped_df(gap_data, groups = key_data(gap_data))
-  lst_out <- summarise(grped_tbl,
-    !!".gaps" := tbl_gaps(!!idx, idx_full, .name = .name))
-
-  vec_cbind(lst_out[key_vars(.data)], vec_cbind(!!!lst_out$.gaps))
+  if (!is_start_stop) {
+    idx_full <- seq_generator(.data[[as_string(idx)]], int)
+    lst_out <- summarise(grped_tbl,
+      !!".gaps" := tbl_gaps(!!idx, idx_full, .name = .name))
+    vec_cbind(lst_out[key_vars(.data)], vec_cbind(!!!lst_out$.gaps))
+  } else {
+    idx2 <- index2(.data)
+    lst_out <- summarise(grped_tbl,".from" := min(!!idx),".to" := max(!!idx2),".n" := n())
+  }
 }
 
 #' Does a tsibble have implicit gaps in time?
@@ -263,7 +268,7 @@ count_gaps <- function(.data, .full = FALSE, .name = c(".from", ".to", ".n")) {
 has_gaps <- function(.data, .full = FALSE, .name = ".gaps") {
   stopifnot(has_length(.name, 1))
   is_start_stop <- (index(.data)!=index2(.data))
-  if ((!is_regular(.data) && !is_start_stop) || vec_size(.data) == 0L) {
+  if ((!is_regular(.data) && !is_start_stop) || vec_size(.data) == 0L || ( is_start_stop && vec_size(.data) == 1L)) {
     key_data <- key_data(.data)[key_vars(.data)]
     return(tibble(!!!key_data, !!.name := FALSE))
   }
@@ -296,8 +301,14 @@ has_gaps <- function(.data, .full = FALSE, .name = ".gaps") {
       abort_invalid_full_arg()
     }
   tibble(!!!res)
-  } else if (is_start_stop) {
-    print("start_stop has gaps...")
+  } else {
+    res <- count_gaps(.data)
+    if (vec_size(res)>0) {
+      res %>% summarise(!!.name := .n>0)
+    } else{
+      key_data <- key_data(.data)[key_vars(.data)]
+      return(tibble(!!!key_data, !!.name := FALSE))
+    }
   }
 }
 
