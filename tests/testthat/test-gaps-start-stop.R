@@ -54,15 +54,15 @@ test_that("a tbl_ts of 1 day interval with no replacement", {
   expect_identical(dim(full_tsbl), c(5L, 3L))
   expect_equal(
     as_tibble(full_tsbl[4, ]),
-    tibble(start = ymd("2017-01-10"),stop = ymd("2017-01-17"), value = NA_real_)
+    tibble(start = ymd("2017-01-13"),stop = ymd("2017-01-17"), value = NA_real_)
   )
 })
 
-test_that("a tbl_ts of 4 day interval with value replacement", {
+test_that("a tbl_ts of 1 day interval with value replacement", {
   full_tsbl <- fill_gaps(tsbl, value = 0)
   expect_equal(
     as_tibble(full_tsbl[4, ]),
-    tibble(start = ymd("2017-01-10"),stop = ymd("2017-01-17"), value = 0)
+    tibble(start = ymd("2017-01-13"),stop = ymd("2017-01-17"), value = 0)
   )
 })
 
@@ -75,12 +75,14 @@ test_that("a tbl_ts of 4 day interval with function replacement", {
 })
 
 dat_x <- tibble(
-  date = rep(idx_day, 2),
+  start = rep(idx_day, 2),
+  stop = rep(idx_day + ddays(4), 2),
   group = rep(letters[1:2], each = 5),
   value = rep(1:2, each = 5)
 )
+
 dat_y <- dat_x[c(2:8, 10), ]
-tsbl <- as_tsibble(dat_y, key = group, index = date)
+tsbl <- build_tsibble(dat_y,key = group, index = start, index2=stop, interval = FALSE)
 
 test_that("fill_gaps() for corner case", {
   expect_identical(fill_gaps(tsbl[1:5, ]), tsbl[1:5, ])
@@ -89,7 +91,8 @@ test_that("fill_gaps() for corner case", {
 tourism <- tourism %>%
   group_by_key() %>%
   slice(1:10) %>%
-  ungroup()
+  ungroup() %>%
+  mutate(q_start = map(Quarter, ~.x %>% date))
 
 test_that("fill_gaps() for yearquarter", {
   full_tsbl <- tourism %>%

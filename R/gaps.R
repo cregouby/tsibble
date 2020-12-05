@@ -156,7 +156,6 @@ scan_gaps.tbl_ts <- function(.data, .full = FALSE) {
       update_meta(gap_data, .data, ordered = NULL, interval = interval(.data))
     }
   } else {
-    # print("start_stop scan gaps...")
     idx2 <- index2(.data)
     idx2_chr <- as_string(idx2)
     min_start <- min(min(keyed_tbl[[idx]], na.rm=TRUE), min(keyed_tbl[[idx2]], na.rm=TRUE), na.rm=TRUE)
@@ -174,11 +173,11 @@ scan_gaps.tbl_ts <- function(.data, .full = FALSE) {
     sum_data <- keyed_tbl %>%
       select(!!idx, !!idx2) %>%
       arrange(!!idx, .by_group = TRUE) %>%
-      mutate(gap_start = !!idx2 ,
-             gap_stop  = lead(!!idx),
-             is_gap = gap_stop > gap_start + int) %>%
+      mutate(gap_start := !!idx2 ,
+             gap_stop := lead(!!idx),
+             is_gap := gap_stop > (gap_start + int)) %>%
         filter(is_gap) %>%
-        select(!!idx := gap_start, !!idx2 := gap_stop)
+        select(!!idx := gap_start, !!idx2 := gap_stop, is_gap)
     if (is_true(.full)) {
       sum_data <- bind_rows(idx_min, sum_data, idx_max) %>% filter(is_gap) %>% arrange(!!idx, .by_group = TRUE)
     } else if (is_false(.full)) {
@@ -223,7 +222,6 @@ scan_gaps.tbl_ts <- function(.data, .full = FALSE) {
 #'   coord_flip() +
 #'   theme(legend.position = "bottom")
 count_gaps <- function(.data, .full = FALSE, .name = c(".from", ".to", ".n")) {
-  # TODO a better test
   is_start_stop <- (index(.data)!=index2(.data))
   int <- default_time_units(interval(.data))
   idx <- index(.data)
