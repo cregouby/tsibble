@@ -87,7 +87,7 @@ fill_gaps.tbl_ts <- function(.data, ..., .full = FALSE) {
   if (!is_empty(lst_exprs)) { # any replacement
     # error handling
     eval_select(names(lst_exprs), .data)
-    replaced_df <- ungroup(summarise(as_tibble(.data), !!!lst_exprs))
+    replaced_df <- ungroup(summarise(group_by(ungroup(as_tibble(.data)),!!!key(.data)), !!!lst_exprs))
     by_name <- intersect(names(gap_data), names(replaced_df))
     if (is_empty(by_name)) { # by value
       gap_data <- mutate(gap_data, !!!replaced_df)
@@ -179,13 +179,13 @@ scan_gaps.tbl_ts <- function(.data, .full = FALSE) {
         filter(is_gap) %>%
         select(!!idx := gap_start, !!idx2 := gap_stop, is_gap)
     if (is_true(.full)) {
-      sum_data <- bind_rows(idx_min, sum_data, idx_max) %>% filter(is_gap) %>% arrange(!!idx, .by_group = TRUE)
+      sum_data <- bind_rows(idx_min, sum_data, idx_max) %>% filter(is_gap) %>% select(-is_gap) %>% arrange(!!idx, .by_group = TRUE)
     } else if (is_false(.full)) {
-      sum_data <- sum_data
+      sum_data <- sum_data %>% select(-is_gap)
     } else if (.full == expr("start()")) {
-      sum_data <- bind_rows(idx_min, sum_data) %>% filter(is_gap) %>% arrange(!!idx, .by_group = TRUE)
+      sum_data <- bind_rows(idx_min, sum_data) %>% filter(is_gap) %>% select(-is_gap) %>% arrange(!!idx, .by_group = TRUE)
     } else if (.full == expr("end()")) {
-      sum_data <- bind_rows(sum_data, idx_max) %>% filter(is_gap) %>% arrange(!!idx, .by_group = TRUE)
+      sum_data <- bind_rows(sum_data, idx_max) %>% filter(is_gap) %>% select(-is_gap) %>% arrange(!!idx, .by_group = TRUE)
     } else {
       abort_invalid_full_arg()
     }

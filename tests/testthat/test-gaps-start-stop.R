@@ -15,7 +15,7 @@ test_that("unknown interval", {
   tsbl <- build_tsibble(dat_x[1, ], index = start, index2=stop)
   expect_identical(fill_gaps(tsbl), tsbl)
   expect_equal(count_gaps(tsbl)$.n, integer(0))
-  expect_identical(scan_gaps(nyc_bikes[0L, ]), nyc_bikes[0L, 1:2])
+  expect_identical(scan_gaps(nyc_bikes[0L, ]), nyc_bikes[0L, 1:3])
   expect_equal(has_gaps(tsbl), tibble(".gaps" = FALSE))
 })
 
@@ -88,20 +88,21 @@ test_that("fill_gaps() for corner case", {
   expect_identical(fill_gaps(tsbl[1:5, ]), tsbl[1:5, ])
 })
 
-tourism <- tourism %>%
-  group_by_key() %>%
-  slice(1:10) %>%
-  ungroup() %>%
-  mutate(q_start = map(Quarter, ~.x %>% date))
-
-test_that("fill_gaps() for yearquarter", {
-  full_tsbl <- tourism %>%
-    fill_gaps()
-  expect_is(full_tsbl$Quarter, "yearquarter")
-})
+# tourism <- tourism %>%
+#   group_by_key() %>%
+#   slice(1:10) %>%
+#   ungroup() %>%
+#   mutate(q_start = map(Quarter, ~.x %>% date))
+#
+# test_that("fill_gaps() for yearquarter", {
+#   full_tsbl <- tourism %>%
+#     fill_gaps()
+#   expect_is(full_tsbl$Quarter, "yearquarter")
+# })
 
 test_that("fill_gaps() for a grouped_ts", {
   full_tsbl <- tsbl %>%
+    ungroup %>%
     group_by(group) %>%
     fill_gaps(value = sum(value), .full = TRUE)
   expect_identical(dim(full_tsbl), c(10L, 3L))
