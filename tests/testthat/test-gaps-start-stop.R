@@ -1,3 +1,4 @@
+library(dplyr)
 idx_day <- seq.Date(ymd("2017-01-01"), ymd("2017-01-20"), by = 4)
 dat_x <- tibble(
   start = idx_day,
@@ -15,6 +16,7 @@ test_that("unknown interval", {
   tsbl <- build_tsibble(dat_x[1, ], index = start, index2=stop)
   expect_identical(fill_gaps(tsbl), tsbl)
   expect_equal(count_gaps(tsbl)$.n, integer(0))
+  # TODO ERROR Can't convert <list_of<integer>> to <datetime<local>>.
   expect_identical(scan_gaps(nyc_bikes[0L, ]), nyc_bikes[0L, 1:3])
   expect_equal(has_gaps(tsbl), tibble(".gaps" = FALSE))
 })
@@ -34,14 +36,16 @@ test_that("a tbl_ts without implicit missing values", {
   )
   expect_identical(count_gaps(tsbl), ref_tbl)
 })
-day1 <- lubridate::ymd_hms("2018-02-27 00:00:00")
-day2 <- day1 + ddays(1)
+midnight1 <- lubridate::ymd_hms("2018-02-27 00:00:00")
+midnight2 <- midnight1 + ddays(1)
 nyc_b1_d1 <- nyc_bikes %>%
-  filter(    bike_id == "26301",    day1 < start_time, start_time < day2  )
+  filter( bike_id == "26301",  midnight1 < start_time, start_time < midnight2  )
 nyc_b6_d1 <- nyc_bikes %>%
-  filter(    bike_id == "31681",    day1 < start_time, start_time < day2  )
+  filter( bike_id == "31681",  midnight1 < start_time, start_time < midnight2  )
 
 test_that("fill_gaps of one bike one day ", {
+  # TODO remove warnings
+  # TODO remove "Adding missing grouping variables: `bike_id`
   expect_identical(NROW(fill_gaps(nyc_b1_d1)), 17L)
   expect_identical(NROW(fill_gaps(nyc_b6_d1)), 5L)
 })
@@ -70,7 +74,7 @@ test_that("a tbl_ts of 4 day interval with function replacement", {
   full_tsbl <- fill_gaps(tsbl, value = sum(value))
   expect_equal(
     as_tibble(full_tsbl[4, ]),
-    tibble(date = ymd("2017-01-13"), value = sum(tsbl$value))
+    tibble(start = ymd("2017-01-13"),stop = ymd("2017-01-17"), value = sum(tsbl$value))
   )
 })
 
@@ -85,6 +89,7 @@ dat_y <- dat_x[c(2:8, 10), ]
 tsbl <- build_tsibble(dat_y,key = group, index = start, index2=stop, interval = FALSE)
 
 test_that("fill_gaps() for corner case", {
+  # TODO fix Attributes mismatch : Attributes: < Component “key”: Attributes: < Component “.drop”: 1 element mismatch > >
   expect_identical(fill_gaps(tsbl[1:5, ]), tsbl[1:5, ])
 })
 
@@ -119,12 +124,14 @@ test_that("fill_gaps() for a grouped_ts", {
 test_that("fill.tbl_ts(.full = TRUE)", {
   full_tsbl <- tsbl %>%
     fill_gaps(.full = TRUE) %>%
+    ungroup %>%
     group_by(group) %>%
     tidyr::fill(value, .direction = "up")
   expect_equivalent(
     as_tibble(full_tsbl[c(1, 9), ]),
     tibble(
-      date = c(ymd("2017-01-01"), ymd("2017-01-13")),
+      start = c(ymd("2017-01-01"),ymd("2017-01-13")),
+      stop = c(ymd("2017-01-05"),ymd("2017-01-17")),
       group = c("a", "b"),
       value = c(1L, 2L)
     )
@@ -134,12 +141,14 @@ test_that("fill.tbl_ts(.full = TRUE)", {
 test_that("fill.tbl_ts(.full = FALSE)", {
   full_tsbl <- tsbl %>%
     fill_gaps() %>%
+    ungroup %>%
     group_by(group) %>%
     tidyr::fill(value, .direction = "up")
   expect_equivalent(
     as_tibble(full_tsbl[8, ]),
     tibble(
-      date = ymd("2017-01-13"),
+      start = ymd("2017-01-13"),
+      stop = ymd("2017-01-17"),
       group = "b",
       value = 2L
     )
@@ -153,7 +162,7 @@ test_that("count_gaps(.full = )", {
     tibble(
       group = c("a", "b"),
       .from = c(ymd("2017-01-01"), ymd("2017-01-13")),
-      .to = c(ymd("2017-01-01"), ymd("2017-01-13")),
+      .to = c(ymd("2017-01-13"), ymd("2017-01-17")),
       .n = c(1L, 1L)
     )
   )
@@ -161,11 +170,13 @@ test_that("count_gaps(.full = )", {
   b <- tibble(
     group = "b",
     .from = ymd("2017-01-13"),
-    .to = ymd("2017-01-13"),
+    .to = ymd("2017-01-17"),
     .n = 1L
   )
   expect_equal(full_tbl_f, b)
+  # TODO `count_gaps(tsbl, .name = NULL)` did not throw an error.
   expect_error(count_gaps(tsbl, .name = NULL), class = "dplyr_error")
+  # TODO `count_gaps(tsbl, .name = 1:4)` did not throw an error.
   expect_error(count_gaps(tsbl, .name = 1:4), class = "dplyr_error")
   expect_named(
     count_gaps(tsbl, .name = c("from", "to", "n")),
